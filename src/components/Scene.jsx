@@ -1,4 +1,4 @@
-import { Suspense, useRef } from 'react'
+import { Suspense, useRef, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   AdaptiveDpr,
@@ -28,13 +28,28 @@ function CameraRig() {
   const controlsRef = useRef()
   const { camera } = useThree()
   const cameraTarget = useLineParameters((state) => state.cameraTarget)
+  const isAnimating = useRef(false)
+  const animProgress = useRef(0)
+  const prevTarget = useRef(null)
+
+  // Only animate when a NEW preset is selected, then stop so user can freely orbit
+  useEffect(() => {
+    isAnimating.current = true
+    animProgress.current = 0
+  }, [cameraTarget])
 
   useFrame((_, delta) => {
-    const smoothing = 1 - Math.exp(-delta * 2.8)
-    camera.position.lerp(new THREE.Vector3(...cameraTarget.position), smoothing)
+    if (!isAnimating.current) return
+    animProgress.current += delta * 2.5
+    const t = Math.min(animProgress.current, 1)
+    const ease = 1 - Math.pow(1 - t, 3) // ease-out cubic
+    camera.position.lerp(new THREE.Vector3(...cameraTarget.position), ease * 0.15)
     if (controlsRef.current) {
-      controlsRef.current.target.lerp(new THREE.Vector3(...cameraTarget.target), smoothing)
+      controlsRef.current.target.lerp(new THREE.Vector3(...cameraTarget.target), ease * 0.15)
       controlsRef.current.update()
+    }
+    if (t >= 1) {
+      isAnimating.current = false
     }
   })
 
@@ -42,10 +57,15 @@ function CameraRig() {
     <OrbitControls
       ref={controlsRef}
       enableDamping
-      dampingFactor={0.08}
-      minDistance={6}
-      maxDistance={40}
+      dampingFactor={0.12}
+      minDistance={2}
+      maxDistance={80}
       maxPolarAngle={Math.PI / 2.05}
+      enablePan
+      panSpeed={1.2}
+      rotateSpeed={0.8}
+      zoomSpeed={1.2}
+      onStart={() => { isAnimating.current = false }}
     />
   )
 }

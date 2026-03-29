@@ -133,6 +133,18 @@ export const VIEW_PRESETS = {
   },
 }
 
+// Per-station camera positions for "walk the line" navigation
+export const STATION_VIEWS = [
+  { key: 'barrelWasher',       label: '1. Barrel Washer',    position: [-18, 5.5, 8],    target: [-18, 2.4, 0] },
+  { key: 'beltElevator',       label: '2. Belt Elevator',    position: [-11, 5.5, 8],    target: [-11, 2.6, 0] },
+  { key: 'starWheelDetangler', label: '3. Star Wheels',      position: [-4.2, 5.5, 7],   target: [-4.2, 2.9, 0] },
+  { key: 'rollerSingulation',  label: '4. Rollers',          position: [1.2, 5.5, 7],    target: [1.2, 3, 0] },
+  { key: 'cameraGantry',       label: '5. Camera/AI',        position: [6.2, 5.5, 7],    target: [6.2, 3.2, 0] },
+  { key: 'infeedConveyor',     label: '6. Infeed',           position: [10, 5.5, 7],     target: [10, 3.1, 0] },
+  { key: 'rotaryTraySorter',   label: '7. Rotary Sorter',    position: [15.2, 6, 8],     target: [15.2, 2.25, 0] },
+  { key: 'gradeBins',          label: '8. Grade Bins',       position: [15.2, 5, 10],    target: [15.2, 0.75, 0] },
+]
+
 export const STATION_INFO = Object.fromEntries(
   Object.values(STATION_DIMENSIONS).map((station) => [station.key, station]),
 )

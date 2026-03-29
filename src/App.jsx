@@ -1,6 +1,7 @@
 import Scene from './components/Scene'
 import ParameterPanel from './components/controls/ParameterPanel'
 import ViewPresets from './components/controls/ViewPresets'
+import StationNav from './components/controls/StationNav'
 import StationTooltip from './components/ui/StationTooltip'
 import FPSCounter from './components/ui/FPSCounter'
 import './App.css'
@@ -21,6 +22,10 @@ export default function App() {
 
         <div className="canvas-wrap">
           <Scene />
+        </div>
+
+        <div className="hud bottom-center">
+          <StationNav />
         </div>
 
         <div className="hud bottom-left">

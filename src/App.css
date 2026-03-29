@@ -219,6 +219,114 @@
   color: #89eb9f;
 }
 
+/* Station Navigation Bar */
+.bottom-center {
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+}
+
+.station-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(9, 13, 18, 0.7);
+  border: 1px solid rgba(159, 190, 211, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.station-nav-arrow {
+  border: 0;
+  border-radius: 50%;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  color: #dce8f3;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: 160ms ease;
+  flex-shrink: 0;
+}
+
+.station-nav-arrow:hover:not(:disabled) {
+  background: #7dc7e8;
+  color: #091118;
+}
+
+.station-nav-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.station-nav-pills {
+  display: flex;
+  gap: 0.3rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.station-nav-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.station-pill {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: #b8c8d6;
+  cursor: pointer;
+  transition: 160ms ease;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.station-pill:hover {
+  background: rgba(125, 199, 232, 0.2);
+  color: #eef4fb;
+}
+
+.station-pill.active {
+  background: #7dc7e8;
+  color: #091118;
+}
+
+.pill-number {
+  font-weight: 700;
+  font-size: 0.72rem;
+  background: rgba(0, 0, 0, 0.15);
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.station-pill.active .pill-number {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.pill-label {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .pill-label {
+    display: inline;
+  }
+}
+
 .scan-indicator {
   font-size: 0.72rem;
   color: #dff7ff;
@@ -254,8 +362,12 @@
     left: 50%;
   }
 
+  .bottom-center {
+    bottom: 4.5rem;
+  }
+
   .bottom-left {
-    bottom: 5.8rem;
+    bottom: 8.5rem;
     right: 1rem;
   }
 

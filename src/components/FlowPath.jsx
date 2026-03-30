@@ -12,17 +12,17 @@ export default function FlowPath() {
   const laneCount = useLineParameters((state) => state.laneCount)
 
   const curve = useMemo(() => {
-    const sampled = sampleBasePath(200, laneCount)
+    const sampled = sampleBasePath(100, laneCount)
     return new THREE.CatmullRomCurve3(sampled, false, 'centripetal', 0.25)
   }, [laneCount])
 
-  const tubeGeometry = useMemo(() => new THREE.TubeGeometry(curve, 220, 0.065, 12, false), [curve])
+  const tubeGeometry = useMemo(() => new THREE.TubeGeometry(curve, 120, 0.0455, 10, false), [curve])
 
   useFrame((state) => {
     const pulse = 0.55 + 0.25 * Math.sin(state.clock.elapsedTime * 2.6)
     if (materialRef.current) {
-      materialRef.current.opacity = 0.22 + pulse * 0.16
-      materialRef.current.emissiveIntensity = 0.34 + pulse * 0.26
+      materialRef.current.opacity = 0.18 + pulse * 0.13
+      materialRef.current.emissiveIntensity = 0.27 + pulse * 0.21
     }
     if (pulseRef.current) {
       pulseRef.current.position.copy(curve.getPointAt((state.clock.elapsedTime * 0.12) % 1))
@@ -38,9 +38,9 @@ export default function FlowPath() {
           ref={materialRef}
           color={FLOW_COLOR}
           emissive={FLOW_COLOR}
-          emissiveIntensity={0.5}
+          emissiveIntensity={0.4}
           transparent
-          opacity={0.34}
+          opacity={0.28}
           roughness={0.22}
           metalness={0.18}
           depthWrite={false}

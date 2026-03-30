@@ -5,18 +5,30 @@ import { SkeletonUtils } from 'three-stdlib'
 import * as THREE from 'three'
 import { STATION_DIMENSIONS } from '../../constants'
 import useLineParameters from '../../hooks/useLineParameters'
+import RootVisual from '../animation/RootVisual'
 import StationLabel from '../ui/StationLabel'
 import DimensionTag from '../ui/DimensionTag'
 
 const MODEL_PATH = '/models/roller-singulation.glb'
 const ENTRY_COLOR = new THREE.Color('#2E8E6F')
 const EXIT_COLOR = new THREE.Color('#E05A3A')
+const RIDING_ROOTS = [
+  { position: [-1.45, 0.38, -0.34], rotation: [0.18, 0.2, 0.92], variantIndex: 0, scale: 10.8 },
+  { position: [-1.1, 0.36, 0.28], rotation: [-0.08, -0.22, 1.0], variantIndex: 1, scale: 11.0 },
+  { position: [-0.25, 0.25, -0.12], rotation: [0.45, 0.08, 1.08], variantIndex: 2, scale: 10.5 },
+  { position: [0.2, 0.12, 0.1], rotation: [0.72, -0.18, 1.18], variantIndex: 3, scale: 10.3 },
+  { position: [0.48, -0.22, -0.32], rotation: [1.3, 0.1, 0.64], variantIndex: 4, scale: 10.0 },
+  { position: [0.95, -0.28, 0.24], rotation: [1.05, -0.12, 0.58], variantIndex: 1, scale: 10.2 },
+  { position: [1.62, 0.34, -0.08], rotation: [0.12, 0.24, 0.94], variantIndex: 2, scale: 11.5 },
+  { position: [1.95, 0.37, 0.34], rotation: [-0.14, -0.18, 1.04], variantIndex: 0, scale: 11.7 },
+]
 
 export default function RollerSingulation() {
   const station = STATION_DIMENSIONS.rollerSingulation
   const { scene } = useGLTF(MODEL_PATH)
   const model = useMemo(() => SkeletonUtils.clone(scene), [scene])
   const rollerRefs = useRef([])
+  const rootRefs = useRef([])
   const {
     rollerGapStart,
     rollerGapEnd,
@@ -86,9 +98,15 @@ export default function RollerSingulation() {
     rollerRefs.current = nextRollers
   }, [model])
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     rollerRefs.current.forEach((roller) => {
       roller.rotation.z += delta * (beltSpeed / 60) * 4.4 * animationSpeed
+    })
+
+    rootRefs.current.forEach((root, index) => {
+      if (!root || index > 3) return
+      root.position.y = RIDING_ROOTS[index].position[1] + Math.sin(state.clock.elapsedTime * 0.8 + index) * 0.02
+      root.rotation.z = RIDING_ROOTS[index].rotation[2] + Math.sin(state.clock.elapsedTime * 0.7 + index) * 0.06
     })
   })
 
@@ -102,6 +120,20 @@ export default function RollerSingulation() {
       onPointerOut={() => setHoveredStation(null)}
     >
       <primitive object={model} />
+
+      {RIDING_ROOTS.map((root, index) => (
+        <group
+          key={`roller-root-${index}`}
+          ref={(node) => {
+            rootRefs.current[index] = node
+          }}
+          position={root.position}
+          rotation={root.rotation}
+        >
+          <RootVisual variantIndex={root.variantIndex} scale={root.scale} haloScale={2.7} />
+        </group>
+      ))}
+
       <StationLabel text={station.name} position={[0, 1.8, 0]} visible={showLabels} />
       <DimensionTag
         text={`14 diverging rollers • gap ${rollerGapStart.toFixed(2)}" → ${rollerGapEnd.toFixed(2)}" • ${laneCount} lane${laneCount > 1 ? 's' : ''}`}

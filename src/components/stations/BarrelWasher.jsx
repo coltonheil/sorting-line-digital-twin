@@ -1,38 +1,43 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Cylinder, RoundedBox } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
+import { SkeletonUtils } from 'three-stdlib'
 import { STATION_DIMENSIONS } from '../../constants'
-import {
-  brushedSteelMaterial,
-  greenMachineMaterial,
-  rubberMaterial,
-} from '../../materials'
 import useLineParameters from '../../hooks/useLineParameters'
 import StationLabel from '../ui/StationLabel'
 import DimensionTag from '../ui/DimensionTag'
 
+const MODEL_PATH = './models/barrel-washer.glb'
+
 export default function BarrelWasher() {
-  const drumRef = useRef()
   const station = STATION_DIMENSIONS.barrelWasher
+  const groupRef = useRef()
+  const drumRef = useRef()
+  const { scene } = useGLTF(MODEL_PATH)
+  const model = useMemo(() => SkeletonUtils.clone(scene), [scene])
   const { animationSpeed, showLabels, showDimensions, setHoveredStation } =
     useLineParameters()
 
-  useFrame((_, delta) => {
-    if (drumRef.current) drumRef.current.rotation.z += delta * 0.22 * animationSpeed
-  })
+  useEffect(() => {
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
+    const drum = model.getObjectByName('drum_body')
+    drumRef.current = drum ?? null
+  }, [model])
 
-  const frameLegs = useMemo(
-    () => [
-      [-1.9, -1.2, -1.1],
-      [-1.9, -1.2, 1.1],
-      [1.9, -1.2, -1.1],
-      [1.9, -1.2, 1.1],
-    ],
-    [],
-  )
+  useFrame((_, delta) => {
+    if (drumRef.current) {
+      drumRef.current.rotation.x += delta * 0.22 * animationSpeed
+    }
+  })
 
   return (
     <group
+      ref={groupRef}
       position={station.center}
       onPointerOver={(e) => {
         e.stopPropagation()
@@ -40,36 +45,7 @@ export default function BarrelWasher() {
       }}
       onPointerOut={() => setHoveredStation(null)}
     >
-      <group ref={drumRef} rotation={[0, 0, Math.PI / 2]}>
-        <Cylinder args={[2, 2, 6, 32]} castShadow receiveShadow>
-          <meshStandardMaterial {...greenMachineMaterial} />
-        </Cylinder>
-        <mesh position={[0, 0, 0]}>
-          <torusGeometry args={[2.06, 0.08, 12, 48]} />
-          <meshStandardMaterial {...rubberMaterial} />
-        </mesh>
-      </group>
-
-      {frameLegs.map((leg) => (
-        <mesh key={leg.join('-')} position={leg} castShadow receiveShadow>
-          <boxGeometry args={[0.18, 2.4, 0.18]} />
-          <meshStandardMaterial {...brushedSteelMaterial} />
-        </mesh>
-      ))}
-
-      <RoundedBox args={[6.4, 0.18, 2.6]} radius={0.05} position={[0, -2.45, 0]}>
-        <meshStandardMaterial {...brushedSteelMaterial} />
-      </RoundedBox>
-
-      <mesh position={[3.5, -1.1, 0]} rotation={[0, 0, -0.52]} castShadow receiveShadow>
-        <boxGeometry args={[2.6, 0.28, 1.2]} />
-        <meshStandardMaterial color="#94a66b" metalness={0.2} roughness={0.55} />
-      </mesh>
-
-      <mesh position={[4.35, -1.8, 0]} rotation={[0, 0, -0.52]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.08, 0.08, 1.2, 12]} />
-        <meshStandardMaterial {...brushedSteelMaterial} />
-      </mesh>
+      <primitive object={model} />
 
       <StationLabel text={station.name} position={[0, 3.6, 0]} visible={showLabels} />
       <DimensionTag
@@ -80,3 +56,5 @@ export default function BarrelWasher() {
     </group>
   )
 }
+
+useGLTF.preload(MODEL_PATH)

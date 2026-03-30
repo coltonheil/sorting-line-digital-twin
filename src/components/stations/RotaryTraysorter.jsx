@@ -1,30 +1,52 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Text } from '@react-three/drei'
+import { Text, useGLTF } from '@react-three/drei'
+import { SkeletonUtils } from 'three-stdlib'
 import { GRADE_LABELS, STATION_DIMENSIONS } from '../../constants'
-import { brushedSteelMaterial, rubberMaterial } from '../../materials'
 import useLineParameters from '../../hooks/useLineParameters'
 import StationLabel from '../ui/StationLabel'
 import DimensionTag from '../ui/DimensionTag'
 
+const MODEL_PATH = './models/rotary-tray-sorter.glb'
+
 export default function RotaryTraysorter() {
   const station = STATION_DIMENSIONS.rotaryTraySorter
-  const trayRefs = useRef([])
+  const { scene } = useGLTF(MODEL_PATH)
+  const model = useMemo(() => SkeletonUtils.clone(scene), [scene])
   const carouselRef = useRef()
+  const trayRefs = useRef([])
   const { carouselSpeed, animationSpeed, showLabels, showDimensions, setHoveredStation } =
     useLineParameters()
-  const trays = useMemo(() => Array.from({ length: station.trayCount }, (_, index) => index), [station.trayCount])
-  const outlets = useMemo(() => Array.from({ length: station.outletCount }, (_, index) => index), [station.outletCount])
+
+  useEffect(() => {
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
+    carouselRef.current =
+      model.getObjectByName('turntable_mesh') ||
+      model.getObjectByName('carousel_disc') ||
+      null
+    trayRefs.current = Array.from({ length: station.trayCount }, (_, index) =>
+      model.getObjectByName(`tray_pivot_${String(index + 1).padStart(2, '0')}`),
+    ).filter(Boolean)
+  }, [model, station.trayCount])
 
   useFrame((state, delta) => {
     if (carouselRef.current) {
-      carouselRef.current.rotation.y -= delta * (carouselSpeed / 60) * Math.PI * 2 * 0.3 * animationSpeed
+      carouselRef.current.rotation.y -=
+        delta * (carouselSpeed / 60) * Math.PI * 2 * 0.3 * animationSpeed
     }
 
     trayRefs.current.forEach((tray, index) => {
-      if (!tray) return
-      const phase = ((state.clock.elapsedTime * animationSpeed * carouselSpeed * 0.12) + index / trays.length) % 1
-      const nearDrop = Math.abs(phase - 0.15) < 0.045 || Math.abs(phase - 0.65) < 0.045
+      const phase =
+        ((state.clock.elapsedTime * animationSpeed * carouselSpeed * 0.12) +
+          index / station.trayCount) %
+        1
+      const nearDrop =
+        Math.abs(phase - 0.15) < 0.045 || Math.abs(phase - 0.65) < 0.045
       tray.rotation.z = nearDrop ? -0.55 : -0.08
     })
   })
@@ -38,60 +60,25 @@ export default function RotaryTraysorter() {
       }}
       onPointerOut={() => setHoveredStation(null)}
     >
-      <mesh receiveShadow castShadow>
-        <cylinderGeometry args={[2.3, 2.4, 0.5, 64]} />
-        <meshStandardMaterial color="#d9dee3" metalness={0.94} roughness={0.23} />
-      </mesh>
+      <primitive object={model} />
 
-      <group ref={carouselRef} position={[0, 0.48, 0]}>
-        <mesh castShadow receiveShadow>
-          <cylinderGeometry args={[1.95, 1.95, 0.2, 64]} />
-          <meshStandardMaterial {...brushedSteelMaterial} />
-        </mesh>
-        {trays.map((tray, index) => {
-          const angle = (index / trays.length) * Math.PI * 2
-          const x = Math.cos(angle) * 1.86
-          const z = Math.sin(angle) * 1.86
-          return (
-            <group key={tray} position={[x, 0.06, z]} rotation={[0, -angle, 0]}>
-              <mesh
-                ref={(node) => {
-                  trayRefs.current[index] = node
-                }}
-                position={[0, 0, 0.32]}
-                castShadow
-                receiveShadow
-              >
-                <boxGeometry args={[0.3, 0.08, 0.5]} />
-                <meshStandardMaterial color="#cfd5dc" metalness={0.88} roughness={0.24} />
-              </mesh>
-            </group>
-          )
-        })}
-      </group>
-
-      {outlets.map((outlet, index) => {
-        const angle = Math.PI * 0.8 + (index / (outlets.length - 1)) * Math.PI * 1.4
+      {GRADE_LABELS.map((label, index) => {
+        const angle = Math.PI * 0.8 + (index / (GRADE_LABELS.length - 1)) * Math.PI * 1.4
         const x = Math.cos(angle) * 3.05
         const z = Math.sin(angle) * 3.05
         return (
-          <group key={outlet} position={[x, -0.2, z]} rotation={[0, -angle, 0]}>
-            <mesh castShadow receiveShadow>
-              <boxGeometry args={[0.72, 0.16, 0.45]} />
-              <meshStandardMaterial {...rubberMaterial} />
-            </mesh>
-            <Text
-              position={[0, -0.45, 0]}
-              fontSize={0.16}
-              color="#cfeeff"
-              anchorX="center"
-              anchorY="middle"
-              rotation={[-Math.PI / 2, 0, 0]}
-              maxWidth={1.8}
-            >
-              {GRADE_LABELS[index]}
-            </Text>
-          </group>
+          <Text
+            key={label}
+            position={[x, -0.65, z]}
+            fontSize={0.16}
+            color="#cfeeff"
+            anchorX="center"
+            anchorY="middle"
+            rotation={[-Math.PI / 2, 0, 0]}
+            maxWidth={1.8}
+          >
+            {label}
+          </Text>
         )
       })}
 
@@ -104,3 +91,5 @@ export default function RotaryTraysorter() {
     </group>
   )
 }
+
+useGLTF.preload(MODEL_PATH)

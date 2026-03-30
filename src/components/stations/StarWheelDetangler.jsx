@@ -7,7 +7,7 @@ import useLineParameters from '../../hooks/useLineParameters'
 import StationLabel from '../ui/StationLabel'
 import DimensionTag from '../ui/DimensionTag'
 
-function StarWheel({ index, refs }) {
+function StarWheel({ registerRef }) {
   const points = useMemo(() => {
     const starPoints = []
     for (let i = 0; i < 16; i += 1) {
@@ -29,7 +29,7 @@ function StarWheel({ index, refs }) {
   }, [points])
 
   return (
-    <group ref={(node) => (refs.current[index] = node)}>
+    <group ref={registerRef}>
       <mesh castShadow receiveShadow>
         <cylinderGeometry args={[0.1, 0.1, 2.2, 18]} rotation={[0, 0, Math.PI / 2]} />
         <meshStandardMaterial {...brushedSteelMaterial} />
@@ -81,7 +81,7 @@ export default function StarWheelDetangler() {
       </mesh>
       {wheelPositions.map((position, index) => (
         <group key={index} position={position}>
-          <StarWheel index={index} refs={wheelRefs} />
+          <StarWheel registerRef={(node) => { wheelRefs.current[index] = node }} />
         </group>
       ))}
       {[-1.6, 1.6].map((x) =>

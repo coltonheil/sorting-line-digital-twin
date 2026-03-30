@@ -30,7 +30,6 @@ function CameraRig() {
   const cameraTarget = useLineParameters((state) => state.cameraTarget)
   const isAnimating = useRef(false)
   const animProgress = useRef(0)
-  const prevTarget = useRef(null)
 
   // Only animate when a NEW preset is selected, then stop so user can freely orbit
   useEffect(() => {
@@ -98,15 +97,14 @@ function SceneContents() {
     <>
       <color attach="background" args={['#0f141a']} />
       <fog attach="fog" args={['#0f141a', 18, 40]} />
-      <ambientLight intensity={0.65} />
+      <Environment files="./hdri/warehouse.hdr" background={false} intensity={1.15} />
       <directionalLight
         position={[9, 14, 6]}
-        intensity={1.45}
+        intensity={0.7}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
-      <spotLight position={[4, 12, -8]} intensity={0.55} angle={0.45} penumbra={0.5} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[80, 40]} />
@@ -143,7 +141,6 @@ function SceneContents() {
       <FloorAnnotations />
 
       <ContactShadows position={[0, 0.02, 0]} scale={40} blur={1.8} opacity={0.45} far={14} />
-      <Environment preset="warehouse" />
 
       <EffectComposer multisampling={4}>
         <SSAO samples={10} radius={0.12} intensity={12} luminanceInfluence={0.3} color="black" />

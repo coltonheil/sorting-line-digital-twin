@@ -6,8 +6,8 @@ import useLineParameters from '../../hooks/useLineParameters'
 
 const ROOT_COUNT = 26
 
-function pointOnPath(t, laneCount, cameraHeight) {
-  if (t < 0.16) return [-20 + t * 28, 0.85 + Math.sin(t * 18) * 0.18, (Math.sin(t * 30) * 0.3)]
+function pointOnPath(t, laneCount) {
+  if (t < 0.16) return [-20 + t * 28, 0.85 + Math.sin(t * 18) * 0.18, Math.sin(t * 30) * 0.3]
   if (t < 0.33) {
     const lt = (t - 0.16) / 0.17
     return [-15.5 + lt * 4.8, 0.65 + lt * 2.55, 0.2 * Math.sin(lt * 8)]
@@ -37,7 +37,7 @@ function pointOnPath(t, laneCount, cameraHeight) {
 export default function RootParticles() {
   const groupRef = useRef()
   const roots = useMemo(() => Array.from({ length: ROOT_COUNT }, (_, index) => index), [])
-  const { beltSpeed, animationSpeed, laneCount, cameraHeight } = useLineParameters()
+  const { beltSpeed, animationSpeed, laneCount } = useLineParameters()
 
   useFrame((state) => {
     if (!groupRef.current) return
@@ -45,7 +45,7 @@ export default function RootParticles() {
     children.forEach((child, index) => {
       const speed = beltSpeed / 60 / 8
       const t = (state.clock.elapsedTime * speed * animationSpeed + index / ROOT_COUNT) % 1
-      const [x, y, z] = pointOnPath(t, laneCount, cameraHeight)
+      const [x, y, z] = pointOnPath(t, laneCount)
       child.position.set(x, y, z)
       child.rotation.set(0.5 + Math.sin(t * 18 + index) * 0.2, t > 0.76 ? t * Math.PI * 2 : 0, 1.2 + Math.cos(t * 22 + index) * 0.18)
       const scanning = t > 0.6 && t < 0.66

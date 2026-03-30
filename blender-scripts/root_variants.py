@@ -186,7 +186,7 @@ def create_root_mesh(config, material):
     skin_layer = bm.verts.layers.skin.verify()
 
     points = []
-    segments = 7
+    segments = 10
     length = config['length']
     for i in range(segments + 1):
         t = i / segments
@@ -213,7 +213,7 @@ def create_root_mesh(config, material):
     for prong_index, prong in enumerate(config['prongs']):
         anchor_idx = max(1, min(segments - 1, round(prong['anchor'] * segments)))
         anchor = trunk_verts[anchor_idx]
-        prong_segments = 3 if prong['length'] > 0.05 else 2
+        prong_segments = 4 if prong['length'] > 0.05 else 3
         direction = (
             math.sin(prong['yaw']) * math.cos(prong['angle']),
             math.sin(abs(prong['angle'])) * 0.65 + 0.15,
@@ -248,8 +248,8 @@ def create_root_mesh(config, material):
 
     skin = obj.modifiers.new(name='Skin', type='SKIN')
     subsurf = obj.modifiers.new(name='Subsurf', type='SUBSURF')
-    subsurf.levels = 1
-    subsurf.render_levels = 1
+    subsurf.levels = 2
+    subsurf.render_levels = 2
 
     texture = bpy.data.textures.new(f"{config['name']}_displace", type='CLOUDS')
     texture.noise_scale = 0.03
@@ -264,7 +264,7 @@ def create_root_mesh(config, material):
     apply_modifier(obj, displace.name)
 
     decimate = obj.modifiers.new(name='Decimate', type='DECIMATE')
-    decimate.ratio = 0.45
+    decimate.ratio = 0.82
     apply_modifier(obj, decimate.name)
 
     bevel = obj.modifiers.new(name='Bevel', type='BEVEL')

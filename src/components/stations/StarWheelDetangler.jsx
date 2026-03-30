@@ -12,7 +12,7 @@ import DimensionTag from '../ui/DimensionTag'
 const MODEL_PATH = '/models/star-wheel-detangler.glb'
 const RUBBER_COLOR = new THREE.Color('#1A1A1A')
 const FRAME_COLOR = new THREE.Color('#C0C0C0')
-const STAR_WHEEL_Y_OFFSET = -0.18
+const STAR_WHEEL_Y_OFFSET = 0
 const STUCK_ROOTS = [
   { shaft: 1, rootPosition: [-0.35, 0.02, -0.18], shaftPosition: [-0.65, 0.1, -0.55], rotation: [0.45, 0.2, 0.9], variantIndex: 0 },
   { shaft: 2, rootPosition: [-0.28, -0.02, 0.12], shaftPosition: [-0.38, -0.02, -0.3], rotation: [-0.35, -0.1, 1.05], variantIndex: 1 },

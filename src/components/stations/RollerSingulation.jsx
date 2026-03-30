@@ -18,6 +18,7 @@ export default function RollerSingulation() {
     rollerGapStart,
     rollerGapEnd,
     laneCount,
+    beltSpeed,
     animationSpeed,
     showLabels,
     showDimensions,
@@ -31,12 +32,12 @@ export default function RollerSingulation() {
         child.receiveShadow = true
       }
     })
-    rollerRefs.current = Array.from({ length: 14 }, (_, index) => model.getObjectByName(`roller_${index + 1}`)).filter(Boolean)
+    rollerRefs.current = Array.from({ length: 14 }, (_, index) => model.getObjectByName(`roller_${index}`)).filter(Boolean)
   }, [model])
 
   useFrame((_, delta) => {
     rollerRefs.current.forEach((roller) => {
-      roller.rotation.z += delta * 2.4 * animationSpeed
+      roller.rotation.z += delta * (beltSpeed / 60) * 3.2 * animationSpeed
     })
   })
 
@@ -52,7 +53,7 @@ export default function RollerSingulation() {
       <primitive object={model} />
       <StationLabel text={station.name} position={[0, 1.8, 0]} visible={showLabels} />
       <DimensionTag
-        text={`Gap ${rollerGapStart.toFixed(2)}" → ${rollerGapEnd.toFixed(2)}" • ${laneCount} lane${laneCount > 1 ? 's' : ''}`}
+        text={`14 diverging rollers • gap ${rollerGapStart.toFixed(2)}" → ${rollerGapEnd.toFixed(2)}" • ${laneCount} lane${laneCount > 1 ? 's' : ''}`}
         position={[0, 1.2, 0]}
         visible={showDimensions}
       />

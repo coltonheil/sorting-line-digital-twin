@@ -5,7 +5,6 @@ import {
   AdaptiveEvents,
   ContactShadows,
   Environment,
-  Float,
   Grid,
   OrbitControls,
   PerspectiveCamera,
@@ -22,6 +21,7 @@ import InfeedConveyor from './stations/InfeedConveyor'
 import RotaryTraysorter from './stations/RotaryTraysorter'
 import GradeBins from './stations/GradeBins'
 import RootParticles from './animation/RootParticles'
+import FlowPath from './FlowPath'
 import useLineParameters from '../hooks/useLineParameters'
 
 function CameraRig() {
@@ -31,7 +31,6 @@ function CameraRig() {
   const isAnimating = useRef(false)
   const animProgress = useRef(0)
 
-  // Only animate when a NEW preset is selected, then stop so user can freely orbit
   useEffect(() => {
     isAnimating.current = true
     animProgress.current = 0
@@ -41,7 +40,7 @@ function CameraRig() {
     if (!isAnimating.current) return
     animProgress.current += delta * 2.5
     const t = Math.min(animProgress.current, 1)
-    const ease = 1 - Math.pow(1 - t, 3) // ease-out cubic
+    const ease = 1 - Math.pow(1 - t, 3)
     camera.position.lerp(new THREE.Vector3(...cameraTarget.position), ease * 0.15)
     if (controlsRef.current) {
       controlsRef.current.target.lerp(new THREE.Vector3(...cameraTarget.target), ease * 0.15)
@@ -105,6 +104,7 @@ function SceneContents() {
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
+      <spotLight position={[-2, 9, 8]} angle={0.38} penumbra={0.5} intensity={0.55} color="#9dcfff" />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[80, 40]} />
@@ -123,6 +123,8 @@ function SceneContents() {
         fadeStrength={1.6}
       />
 
+      <FlowPath />
+
       <group position={[0, 0.02, 0]}>
         <BarrelWasher />
         <BeltElevator />
@@ -134,17 +136,15 @@ function SceneContents() {
         <GradeBins />
       </group>
 
-      <Float speed={1.5} rotationIntensity={0.15} floatIntensity={0.25}>
-        <RootParticles />
-      </Float>
+      <RootParticles />
 
       <FloorAnnotations />
 
       <ContactShadows position={[0, 0.02, 0]} scale={40} blur={1.8} opacity={0.45} far={14} />
 
-      <EffectComposer multisampling={4}>
+      <EffectComposer multisampling={4} enableNormalPass>
         <SSAO samples={10} radius={0.12} intensity={12} luminanceInfluence={0.3} color="black" />
-        <Bloom mipmapBlur intensity={0.45} luminanceThreshold={0.55} />
+        <Bloom mipmapBlur intensity={0.55} luminanceThreshold={0.45} />
       </EffectComposer>
     </>
   )

@@ -14,43 +14,38 @@ export const ROOT_PATHS = [
 ]
 
 let hasLoggedRootBounds = false
+const rootMaterialCache = new Map()
 
 function getMeshFromScene(scene) {
-  let found = null
+  let largestMesh = null
+  let largestVertexCount = -1
+
   scene.traverse((child) => {
-    if (!found && child.isMesh) found = child
+    if (!child.isMesh || !child.geometry?.attributes?.position) return
+    const vertexCount = child.geometry.attributes.position.count
+    if (vertexCount > largestVertexCount) {
+      largestMesh = child
+      largestVertexCount = vertexCount
+    }
   })
-  return found
+
+  return largestMesh
 }
 
-function createHaloTexture() {
-  const size = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, 4, size / 2, size / 2, size / 2)
-  gradient.addColorStop(0, 'rgba(255, 227, 161, 0.95)')
-  gradient.addColorStop(0.35, 'rgba(240, 191, 92, 0.45)')
-  gradient.addColorStop(0.7, 'rgba(212, 168, 85, 0.12)')
-  gradient.addColorStop(1, 'rgba(212, 168, 85, 0)')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, size, size)
+export function createRootMaterial({ emissiveIntensity = 0.5, shared = false } = {}) {
+  const cacheKey = Number(emissiveIntensity.toFixed(3))
+  if (shared && rootMaterialCache.has(cacheKey)) return rootMaterialCache.get(cacheKey)
 
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
-}
-
-export function createRootMaterial({ emissiveIntensity = 0.5 } = {}) {
-  return new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     color: ROOT_COLOR,
     emissive: ROOT_COLOR,
     emissiveIntensity,
     roughness: 0.68,
     metalness: 0.08,
   })
+
+  if (shared) rootMaterialCache.set(cacheKey, material)
+  return material
 }
 
 export function useRootAssets() {
@@ -62,17 +57,26 @@ export function useRootAssets() {
 
   return useMemo(() => {
     const variants = [gltf1, gltf2, gltf3, gltf4, gltf5]
-      .map(({ scene }) => {
+      .map(({ scene }, index) => {
         const mesh = getMeshFromScene(scene)
         if (!mesh) return null
 
-        const bounds = new THREE.Box3().setFromObject(scene)
+        scene.updateWorldMatrix(true, true)
+        const geometry = mesh.geometry.clone()
+        geometry.applyMatrix4(mesh.matrixWorld)
+        geometry.computeBoundingBox()
+        geometry.computeBoundingSphere()
+        const bounds = geometry.boundingBox ?? new THREE.Box3().setFromObject(mesh)
+        const center = bounds.getCenter(new THREE.Vector3())
+        geometry.translate(-center.x, -center.y, -center.z)
+
         const size = bounds.getSize(new THREE.Vector3())
         const renderedLengthAtScale = Math.max(size.x, size.y, size.z) * ROOT_SCALE
 
         if (!hasLoggedRootBounds) {
           console.info('[RootFlow] Root GLB bounds', {
-            path: mesh.name,
+            variant: index + 1,
+            mesh: mesh.name,
             min: bounds.min.toArray(),
             max: bounds.max.toArray(),
             size: size.toArray(),
@@ -81,7 +85,7 @@ export function useRootAssets() {
         }
 
         return {
-          geometry: mesh.geometry,
+          geometry,
           size,
           renderedLengthAtScale,
         }
@@ -96,10 +100,7 @@ export function useRootAssets() {
       hasLoggedRootBounds = true
     }
 
-    return {
-      variants,
-      haloTexture: createHaloTexture(),
-    }
+    return { variants }
   }, [gltf1, gltf2, gltf3, gltf4, gltf5])
 }
 

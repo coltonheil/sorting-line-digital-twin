@@ -12,6 +12,7 @@ import DimensionTag from '../ui/DimensionTag'
 const MODEL_PATH = '/models/star-wheel-detangler.glb'
 const RUBBER_COLOR = new THREE.Color('#1A1A1A')
 const FRAME_COLOR = new THREE.Color('#C0C0C0')
+const STAR_WHEEL_Y_OFFSET = -0.18
 const STUCK_ROOTS = [
   { shaft: 1, rootPosition: [-0.35, 0.02, -0.18], shaftPosition: [-0.65, 0.1, -0.55], rotation: [0.45, 0.2, 0.9], variantIndex: 0 },
   { shaft: 2, rootPosition: [-0.28, -0.02, 0.12], shaftPosition: [-0.38, -0.02, -0.3], rotation: [-0.35, -0.1, 1.05], variantIndex: 1 },
@@ -31,6 +32,7 @@ export default function StarWheelDetangler() {
   const { scene } = useGLTF(MODEL_PATH)
   const model = useMemo(() => SkeletonUtils.clone(scene), [scene])
   const shaftRefs = useRef([])
+  const shaftMeshRefs = useRef([])
   const stuckRootRefs = useRef([])
   const { starWheelSpeed, animationSpeed, showLabels, showDimensions, setHoveredStation } =
     useLineParameters()
@@ -95,6 +97,11 @@ export default function StarWheelDetangler() {
     })
 
     shaftRefs.current = Array.from({ length: 8 }, (_, index) => model.getObjectByName(`star_wheel_shaft_${index}`)).filter(Boolean)
+    shaftMeshRefs.current = Array.from({ length: 8 }, (_, index) => model.getObjectByName(`shaft_${index}`)).filter(Boolean)
+
+    ;[...shaftRefs.current, ...shaftMeshRefs.current].forEach((shaft) => {
+      shaft.position.y += STAR_WHEEL_Y_OFFSET
+    })
   }, [model])
 
   useFrame((_, delta) => {
@@ -108,7 +115,7 @@ export default function StarWheelDetangler() {
       const config = STUCK_ROOTS[index]
       const shaft = shaftRefs.current[config.shaft]
       const localSpin = new THREE.Euler(shaft?.rotation.x ?? 0, 0, 0)
-      rootGroup.position.set(...config.shaftPosition)
+      rootGroup.position.set(config.shaftPosition[0], config.shaftPosition[1] + STAR_WHEEL_Y_OFFSET, config.shaftPosition[2])
       rootGroup.rotation.set(
         config.rotation[0] + localSpin.x,
         config.rotation[1],
@@ -143,7 +150,7 @@ export default function StarWheelDetangler() {
       ))}
 
       {RELEASED_ROOTS.map((root, index) => (
-        <group key={`released-root-${index}`} position={root.position} rotation={root.rotation}>
+        <group key={`released-root-${index}`} position={[root.position[0], root.position[1] + STAR_WHEEL_Y_OFFSET, root.position[2]]} rotation={root.rotation}>
           <RootVisual variantIndex={root.variantIndex} scale={10.8} haloScale={2.6} />
         </group>
       ))}

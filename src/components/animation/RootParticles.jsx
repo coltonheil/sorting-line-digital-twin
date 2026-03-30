@@ -3,22 +3,67 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import useLineParameters from '../../hooks/useLineParameters'
 import { basePath, logRootPathAlignment } from './rootPath'
-import { createRootMaterial, ROOT_COLOR, ROOT_EMISSIVE, ROOT_SCALE, useRootAssets } from './rootAssets'
+import { createRootMaterial, ROOT_SCALE, useRootAssets } from './rootAssets'
 
-const ROOT_COUNT = 28
-
+const ROOT_COUNT = 20
 const tmpCurrent = new THREE.Vector3()
 const tmpNext = new THREE.Vector3()
+const tmpPosition = new THREE.Vector3()
+const tmpQuaternion = new THREE.Quaternion()
+const tmpTiltQuat = new THREE.Quaternion()
+const tmpEuler = new THREE.Euler()
+const tmpMatrix = new THREE.Matrix4()
+const tmpScale = new THREE.Vector3()
 const up = new THREE.Vector3(0, 1, 0)
-const quat = new THREE.Quaternion()
-const tiltQuat = new THREE.Quaternion()
-const euler = new THREE.Euler()
 let hasLoggedAlignment = false
 
+function RootBatch({ roots, geometry, material, beltSpeed, animationSpeed, laneCount, timeOffset = 0 }) {
+  const meshRef = useRef()
+
+  useFrame((state) => {
+    if (!meshRef.current) return
+    const speed = (beltSpeed / 60 / 8) * animationSpeed
+    const elapsedTime = state.clock.elapsedTime + timeOffset
+
+    roots.forEach((config, index) => {
+      const t = (elapsedTime * speed * config.speedJitter + config.phase) % 1
+      const tAhead = (t + 0.003) % 1
+      const current = basePath(t, laneCount, config)
+      const next = basePath(tAhead, laneCount, config)
+
+      const wobbleX = Math.sin(elapsedTime * 2.4 + config.wobblePhase) * config.wobbleAmount
+      const wobbleZ = Math.cos(elapsedTime * 1.8 + config.wobblePhase * 0.7) * config.wobbleAmount
+      tmpPosition.set(current.x + wobbleX, current.y, current.z + wobbleZ)
+
+      tmpCurrent.copy(current)
+      tmpNext.copy(next).sub(tmpCurrent).normalize()
+      tmpQuaternion.setFromUnitVectors(up, tmpNext)
+
+      tmpEuler.set(
+        config.tilt.x + elapsedTime * config.tumble.x,
+        config.tilt.y + elapsedTime * config.tumble.y,
+        config.tilt.z + elapsedTime * config.tumble.z,
+      )
+      tmpTiltQuat.setFromEuler(tmpEuler)
+      tmpQuaternion.multiply(tmpTiltQuat)
+
+      const scanning = t > 0.79 && t < 0.84
+      const scale = config.scale * (scanning ? config.scanningBoost : 1)
+      tmpScale.setScalar(scale)
+      tmpMatrix.compose(tmpPosition, tmpQuaternion, tmpScale)
+      meshRef.current.setMatrixAt(index, tmpMatrix)
+    })
+
+    meshRef.current.instanceMatrix.needsUpdate = true
+  })
+
+  return <instancedMesh ref={meshRef} args={[geometry, material, roots.length]} castShadow receiveShadow frustumCulled={false} />
+}
+
 export default function RootParticles() {
-  const groupRef = useRef()
   const { beltSpeed, animationSpeed, laneCount } = useLineParameters()
   const { variants: meshVariants } = useRootAssets()
+  const sharedMaterial = useMemo(() => createRootMaterial({ emissiveIntensity: 0.52, shared: true }), [])
 
   const roots = useMemo(
     () =>
@@ -26,11 +71,10 @@ export default function RootParticles() {
         const clusterSize = 3 + (index % 4)
         const groupIndex = Math.floor(index / 4)
         const laneSlot = index % 3
-        const variantIndex = index % meshVariants.length
+        const variantIndex = meshVariants.length ? index % meshVariants.length : 0
         return {
           index,
           variantIndex,
-          material: createRootMaterial(),
           phase: index / ROOT_COUNT,
           speedJitter: 0.9 + (index % 7) * 0.04,
           wobblePhase: index * 1.37,
@@ -59,60 +103,35 @@ export default function RootParticles() {
     [meshVariants],
   )
 
+  const rootsByVariant = useMemo(() => {
+    if (!meshVariants.length) return []
+    return meshVariants.map((variant, variantIndex) => ({
+      geometry: variant.geometry,
+      roots: roots.filter((root) => root.variantIndex === variantIndex),
+    })).filter((entry) => entry.roots.length > 0)
+  }, [meshVariants, roots])
+
   useEffect(() => {
     if (!hasLoggedAlignment) {
       logRootPathAlignment()
       hasLoggedAlignment = true
     }
-
-    return () => {
-      roots.forEach((root) => root.material.dispose())
-    }
-  }, [roots])
-
-  useFrame((state) => {
-    if (!groupRef.current) return
-    const children = groupRef.current.children
-    const speed = (beltSpeed / 60 / 8) * animationSpeed
-
-    children.forEach((child, index) => {
-      const config = roots[index]
-      const t = (state.clock.elapsedTime * speed * config.speedJitter + config.phase) % 1
-      const tAhead = (t + 0.003) % 1
-      const current = basePath(t, laneCount, config)
-      const next = basePath(tAhead, laneCount, config)
-
-      const wobbleX = Math.sin(state.clock.elapsedTime * 2.4 + config.wobblePhase) * config.wobbleAmount
-      const wobbleZ = Math.cos(state.clock.elapsedTime * 1.8 + config.wobblePhase * 0.7) * config.wobbleAmount
-      child.position.set(current.x + wobbleX, current.y, current.z + wobbleZ)
-
-      tmpCurrent.copy(current)
-      tmpNext.copy(next).sub(tmpCurrent).normalize()
-      quat.setFromUnitVectors(up, tmpNext)
-      child.quaternion.copy(quat)
-
-      euler.set(
-        config.tilt.x + state.clock.elapsedTime * config.tumble.x,
-        config.tilt.y + state.clock.elapsedTime * config.tumble.y,
-        config.tilt.z + state.clock.elapsedTime * config.tumble.z,
-      )
-      tiltQuat.setFromEuler(euler)
-      child.quaternion.multiply(tiltQuat)
-
-      const scanning = t > 0.79 && t < 0.84
-      const scale = config.scale * (scanning ? config.scanningBoost : 1)
-      child.scale.setScalar(scale)
-      child.material.emissive.copy(scanning ? ROOT_EMISSIVE : ROOT_COLOR)
-      child.material.emissiveIntensity = scanning ? 0.62 : 0.5
-    })
-  })
+  }, [])
 
   return (
-    <group ref={groupRef}>
-      {roots.map((root) => {
-        const variant = meshVariants[root.variantIndex]
-        return <mesh key={root.index} geometry={variant.geometry} material={root.material} castShadow receiveShadow />
-      })}
+    <group>
+      {rootsByVariant.map((entry, index) => (
+        <RootBatch
+          key={`root-batch-${index}`}
+          roots={entry.roots}
+          geometry={entry.geometry}
+          material={sharedMaterial}
+          beltSpeed={beltSpeed}
+          animationSpeed={animationSpeed}
+          laneCount={laneCount}
+          timeOffset={index * 0.0375}
+        />
+      ))}
     </group>
   )
 }

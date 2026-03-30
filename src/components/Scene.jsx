@@ -10,7 +10,6 @@ import {
   PerspectiveCamera,
   Text,
 } from '@react-three/drei'
-import { EffectComposer, Bloom, SSAO } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import BarrelWasher from './stations/BarrelWasher'
 import BeltElevator from './stations/BeltElevator'
@@ -140,12 +139,7 @@ function SceneContents() {
 
       <FloorAnnotations />
 
-      <ContactShadows position={[0, 0.02, 0]} scale={40} blur={1.8} opacity={0.45} far={14} />
-
-      <EffectComposer multisampling={4} enableNormalPass>
-        <SSAO samples={10} radius={0.12} intensity={12} luminanceInfluence={0.3} color="black" />
-        <Bloom mipmapBlur intensity={0.55} luminanceThreshold={0.45} />
-      </EffectComposer>
+      <ContactShadows position={[0, 0.02, 0]} scale={40} blur={1.6} opacity={0.42} far={14} resolution={512} />
     </>
   )
 }

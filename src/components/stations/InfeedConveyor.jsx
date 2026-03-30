@@ -1,12 +1,27 @@
+import { useEffect, useMemo } from 'react'
+import { useGLTF } from '@react-three/drei'
+import { SkeletonUtils } from 'three-stdlib'
 import { STATION_DIMENSIONS } from '../../constants'
-import { brushedSteelMaterial, rubberMaterial } from '../../materials'
 import useLineParameters from '../../hooks/useLineParameters'
 import StationLabel from '../ui/StationLabel'
 import DimensionTag from '../ui/DimensionTag'
 
+const MODEL_PATH = '/models/infeed-conveyor.glb'
+
 export default function InfeedConveyor() {
   const station = STATION_DIMENSIONS.infeedConveyor
+  const { scene } = useGLTF(MODEL_PATH)
+  const model = useMemo(() => SkeletonUtils.clone(scene), [scene])
   const { showLabels, showDimensions, setHoveredStation } = useLineParameters()
+
+  useEffect(() => {
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
+  }, [model])
 
   return (
     <group
@@ -17,24 +32,11 @@ export default function InfeedConveyor() {
       }}
       onPointerOut={() => setHoveredStation(null)}
     >
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[2.7, 0.14, 1.25]} />
-        <meshStandardMaterial {...rubberMaterial} />
-      </mesh>
-      <mesh position={[1.15, -0.1, 0]} rotation={[0, 0, -0.18]} castShadow>
-        <boxGeometry args={[0.9, 0.16, 1.1]} />
-        <meshStandardMaterial color="#dde4e6" metalness={0.7} roughness={0.28} />
-      </mesh>
-      {[-1.1, 1.1].map((x) =>
-        [-0.55, 0.55].map((z) => (
-          <mesh key={`${x}-${z}`} position={[x, -0.7, z]} castShadow>
-            <boxGeometry args={[0.1, 1.4, 0.1]} />
-            <meshStandardMaterial {...brushedSteelMaterial} />
-          </mesh>
-        )),
-      )}
+      <primitive object={model} />
       <StationLabel text={station.name} position={[0, 1.5, 0]} visible={showLabels} />
       <DimensionTag text="Transfer bridge" position={[0, 0.95, 0]} visible={showDimensions} />
     </group>
   )
 }
+
+useGLTF.preload(MODEL_PATH)

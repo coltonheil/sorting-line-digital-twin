@@ -1,268 +1,148 @@
 import bpy
 import math
 import os
-from mathutils import Vector
+import sys
 
-# Clear default scene
-bpy.ops.object.select_all(action='SELECT')
-bpy.ops.object.delete()
-
-bpy.context.scene.unit_settings.system = 'METRIC'
-bpy.context.scene.unit_settings.scale_length = 1.0
+sys.path.append(os.path.dirname(__file__))
+from model_utils import *
 
 OUTPUT_PATH = os.path.expanduser('~/repos/sorting-line-digital-twin/public/models/barrel-washer.glb')
 
+clear_scene()
 
-def apply_bevel(obj, width=0.01, segments=2):
-    mod = obj.modifiers.new(name='Bevel', type='BEVEL')
-    mod.width = width
-    mod.segments = segments
-    mod.limit_method = 'ANGLE'
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(modifier=mod.name)
+stainless = make_principled_material('Stainless', (0.78, 0.79, 0.8), metallic=0.88, roughness=0.25, brushed=True, noise_bump=0.01)
+frame_mat = make_principled_material('FrameDark', (0.2, 0.21, 0.23), metallic=0.2, roughness=0.72)
+motor_mat = make_principled_material('Motor', (0.13, 0.13, 0.14), metallic=0.3, roughness=0.58)
+chain_mat = make_principled_material('Chain', (0.18, 0.18, 0.17), metallic=0.75, roughness=0.42)
+rubber = make_principled_material('RubberSeal', (0.05, 0.05, 0.055), metallic=0.0, roughness=0.88)
+water = make_principled_material('Water', (0.55, 0.72, 0.82), metallic=0.0, roughness=0.08, transmission=0.15, alpha=0.8)
 
-
-def shade_smooth(obj):
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.object.shade_smooth()
-    obj.select_set(False)
-
-
-def make_principled_material(name, base_color, metallic=0.0, roughness=0.5, transmission=0.0, ior=1.45, alpha=1.0):
-    mat = bpy.data.materials.new(name=name)
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    links = mat.node_tree.links
-    for node in list(nodes):
-        nodes.remove(node)
-
-    out = nodes.new(type='ShaderNodeOutputMaterial')
-    out.location = (300, 0)
-    bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-    bsdf.location = (0, 0)
-    bsdf.inputs['Base Color'].default_value = (*base_color, 1.0)
-    bsdf.inputs['Metallic'].default_value = metallic
-    bsdf.inputs['Roughness'].default_value = roughness
-    bsdf.inputs['Transmission Weight'].default_value = transmission
-    bsdf.inputs['IOR'].default_value = ior
-    bsdf.inputs['Alpha'].default_value = alpha
-
-    noise = nodes.new(type='ShaderNodeTexNoise')
-    noise.location = (-700, 140)
-    noise.inputs['Scale'].default_value = 38.0
-    noise.inputs['Detail'].default_value = 8.0
-
-    wave = nodes.new(type='ShaderNodeTexWave')
-    wave.location = (-700, -80)
-    wave.wave_type = 'BANDS'
-    wave.bands_direction = 'X'
-    wave.inputs['Scale'].default_value = 180.0
-    wave.inputs['Distortion'].default_value = 2.0
-
-    mix = nodes.new(type='ShaderNodeMixRGB')
-    mix.location = (-420, 20)
-    mix.blend_type = 'MULTIPLY'
-    mix.inputs['Fac'].default_value = 0.25
-
-    bump = nodes.new(type='ShaderNodeBump')
-    bump.location = (-180, -100)
-    bump.inputs['Strength'].default_value = 0.025
-
-    links.new(noise.outputs['Fac'], mix.inputs['Color1'])
-    links.new(wave.outputs['Color'], mix.inputs['Color2'])
-    links.new(mix.outputs['Color'], bump.inputs['Height'])
-    links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
-    links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
-
-    if transmission > 0:
-        mat.blend_method = 'BLEND'
-
-    return mat
-
-
-stainless = make_principled_material('StainlessSteel', (0.77, 0.78, 0.76), metallic=0.86, roughness=0.35)
-frame_mat = make_principled_material('FramePaint', (0.18, 0.19, 0.21), metallic=0.18, roughness=0.72)
-motor_mat = make_principled_material('MotorCast', (0.11, 0.11, 0.12), metallic=0.35, roughness=0.62)
-chute_mat = make_principled_material('SheetSteel', (0.82, 0.83, 0.82), metallic=0.92, roughness=0.24)
-chain_mat = make_principled_material('OilyMetal', (0.18, 0.18, 0.17), metallic=0.75, roughness=0.48)
-water_mat = make_principled_material('WaterTint', (0.54, 0.72, 0.82), metallic=0.0, roughness=0.05, transmission=0.2)
-
-# Dimensions in meters
 ft = 0.3048
-drum_radius = 2 * ft
-drum_length = 6 * ft
-frame_height = 2 * ft
-frame_width = 1.45
-frame_length = 2.2
+radius = 2 * ft
+length = 6 * ft
+center_y = 1.28
 
-# Drum shell
-bpy.ops.mesh.primitive_cylinder_add(vertices=72, radius=drum_radius, depth=drum_length, location=(0, frame_height + drum_radius + 0.04, 0), rotation=(0, math.pi / 2, 0))
+# Drum with perforation-style material relief
+bpy.ops.mesh.primitive_cylinder_add(vertices=84, radius=radius, depth=length, location=(0, center_y, 0), rotation=(0, math.pi / 2, 0))
 drum = bpy.context.active_object
 drum.name = 'drum_body'
-drum.data.materials.append(stainless)
 solid = drum.modifiers.new(name='Solidify', type='SOLIDIFY')
-solid.thickness = 0.035
-wire = drum.modifiers.new(name='WireframeLook', type='WIREFRAME')
-wire.thickness = 0.015
-wire.use_replace = False
-wire.use_even_offset = True
-subd = drum.modifiers.new(name='Subd', type='SUBSURF')
-subd.levels = 1
-subd.render_levels = 1
-for mod in [solid, wire, subd]:
-    bpy.context.view_layer.objects.active = drum
-    bpy.ops.object.modifier_apply(modifier=mod.name)
+solid.thickness = 0.028
+bpy.context.view_layer.objects.active = drum
+bpy.ops.object.modifier_apply(modifier=solid.name)
+
+# radial ribs for more structure
+for x in (-0.72, -0.24, 0.24, 0.72):
+    add_torus(f'drum_rib_{str(x).replace("-", "m").replace(".", "_")}', location=(x, center_y, 0), major_radius=radius + 0.01, minor_radius=0.015, rotation=(0, math.pi / 2, 0), material=chain_mat)
+
+# perforation bump / dark spotting
+mat = bpy.data.materials.new('PerforatedSteel')
+mat.use_nodes = True
+nodes = mat.node_tree.nodes
+links = mat.node_tree.links
+for node in list(nodes):
+    nodes.remove(node)
+out = nodes.new(type='ShaderNodeOutputMaterial')
+out.location = (420, 0)
+bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
+bsdf.location = (100, 0)
+bsdf.inputs['Base Color'].default_value = (0.76, 0.77, 0.78, 1.0)
+bsdf.inputs['Metallic'].default_value = 0.9
+bsdf.inputs['Roughness'].default_value = 0.24
+texcoord = nodes.new(type='ShaderNodeTexCoord')
+texcoord.location = (-920, 0)
+mapping = nodes.new(type='ShaderNodeMapping')
+mapping.location = (-720, 0)
+mapping.inputs['Scale'].default_value = (12.0, 32.0, 32.0)
+vor = nodes.new(type='ShaderNodeTexVoronoi')
+vor.location = (-500, 40)
+vor.feature = 'DISTANCE_TO_EDGE'
+vor.inputs['Scale'].default_value = 26.0
+ramp = nodes.new(type='ShaderNodeValToRGB')
+ramp.location = (-260, 40)
+ramp.color_ramp.elements[0].position = 0.08
+ramp.color_ramp.elements[1].position = 0.14
+bump = nodes.new(type='ShaderNodeBump')
+bump.location = (-80, -120)
+bump.inputs['Strength'].default_value = 0.03
+mix = nodes.new(type='ShaderNodeMixRGB')
+mix.location = (-80, 100)
+mix.blend_type = 'MULTIPLY'
+mix.inputs['Fac'].default_value = 0.2
+base_rgb = nodes.new(type='ShaderNodeRGB')
+base_rgb.location = (-280, 160)
+base_rgb.outputs[0].default_value = (0.78, 0.79, 0.8, 1.0)
+dark_rgb = nodes.new(type='ShaderNodeRGB')
+dark_rgb.location = (-280, -20)
+dark_rgb.outputs[0].default_value = (0.56, 0.57, 0.58, 1.0)
+links.new(texcoord.outputs['Object'], mapping.inputs['Vector'])
+links.new(mapping.outputs['Vector'], vor.inputs['Vector'])
+links.new(vor.outputs['Distance'], ramp.inputs['Fac'])
+links.new(ramp.outputs['Color'], bump.inputs['Height'])
+links.new(base_rgb.outputs['Color'], mix.inputs['Color1'])
+links.new(dark_rgb.outputs['Color'], mix.inputs['Color2'])
+links.new(ramp.outputs['Color'], mix.inputs['Fac'])
+links.new(mix.outputs['Color'], bsdf.inputs['Base Color'])
+links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+drum.data.materials.append(mat)
 shade_smooth(drum)
 
-# Support rings
-for x in (-0.74, 0.74):
-    bpy.ops.mesh.primitive_torus_add(major_radius=drum_radius + 0.035, minor_radius=0.03, major_segments=56, minor_segments=14, location=(x, frame_height + drum_radius + 0.04, 0), rotation=(0, math.pi / 2, 0))
-    ring = bpy.context.active_object
-    ring.name = f'drum_support_ring_{"left" if x < 0 else "right"}'
-    ring.data.materials.append(chain_mat)
-    shade_smooth(ring)
+# rubber end rings
+for side, x in [('left', -0.9), ('right', 0.9)]:
+    add_torus(f'rubber_ring_{side}', location=(x, center_y, 0), major_radius=radius + 0.02, minor_radius=0.03, rotation=(0, math.pi / 2, 0), material=rubber)
 
-# Frame rails and legs
-frame_parts = []
-rail_specs = [
-    ((0, frame_height + 0.12, -0.72), (frame_length, 0.08, 0.08), 'frame_rail_back'),
-    ((0, frame_height + 0.12, 0.72), (frame_length, 0.08, 0.08), 'frame_rail_front'),
-    ((0, 0.36, -0.72), (frame_length, 0.06, 0.06), 'frame_lower_back'),
-    ((0, 0.36, 0.72), (frame_length, 0.06, 0.06), 'frame_lower_front'),
-    ((-0.96, frame_height + 0.12, 0), (0.08, 0.08, 1.52), 'frame_cross_left'),
-    ((0.96, frame_height + 0.12, 0), (0.08, 0.08, 1.52), 'frame_cross_right'),
-]
-for loc, scale, name in rail_specs:
-    bpy.ops.mesh.primitive_cube_add(location=loc)
-    obj = bpy.context.active_object
-    obj.name = name
-    obj.scale = scale
-    obj.data.materials.append(frame_mat)
-    apply_bevel(obj, 0.008, 2)
-    frame_parts.append(obj)
+# Frame and braces
+for name, loc, scale in [
+    ('frame_rail_front_top', (0, 0.72, 0.72), (1.08, 0.04, 0.04)),
+    ('frame_rail_back_top', (0, 0.72, -0.72), (1.08, 0.04, 0.04)),
+    ('frame_rail_front_low', (0, 0.24, 0.72), (1.08, 0.03, 0.03)),
+    ('frame_rail_back_low', (0, 0.24, -0.72), (1.08, 0.03, 0.03)),
+    ('frame_cross_left', (-0.96, 0.72, 0), (0.04, 0.04, 0.72)),
+    ('frame_cross_right', (0.96, 0.72, 0), (0.04, 0.04, 0.72)),
+]:
+    add_cube(name, location=loc, scale=scale, material=frame_mat, bevel=0.002)
 
-leg_positions = [(-0.92, frame_height / 2, -0.64), (-0.92, frame_height / 2, 0.64), (0.92, frame_height / 2, -0.64), (0.92, frame_height / 2, 0.64)]
-for i, pos in enumerate(leg_positions, 1):
-    bpy.ops.mesh.primitive_cube_add(location=pos)
-    leg = bpy.context.active_object
-    leg.name = f'frame_leg_{i}'
-    leg.scale = (0.05, frame_height / 2, 0.05)
-    leg.data.materials.append(frame_mat)
-    apply_bevel(leg, 0.008, 2)
-    frame_parts.append(leg)
+for i, pos in enumerate([(-0.92, 0.36, -0.64), (-0.92, 0.36, 0.64), (0.92, 0.36, -0.64), (0.92, 0.36, 0.64)], 1):
+    add_cube(f'frame_leg_{i}', location=pos, scale=(0.04, 0.36, 0.04), material=frame_mat, bevel=0.002)
+    add_cylinder(f'foot_pad_{i}', location=(pos[0], 0.01, pos[2]), radius=0.05, depth=0.02, material=frame_mat, vertices=16)
 
-brace_data = [
-    ((-0.92, 0.6, 0), (0.03, 0.03, 0.95), 0.7),
-    ((0.92, 0.6, 0), (0.03, 0.03, 0.95), -0.7),
-]
-for idx, (loc, scale, rot) in enumerate(brace_data, 1):
-    bpy.ops.mesh.primitive_cube_add(location=loc, rotation=(rot, 0, 0))
-    brace = bpy.context.active_object
-    brace.name = f'cross_brace_{idx}'
-    brace.scale = scale
-    brace.data.materials.append(frame_mat)
-    apply_bevel(brace, 0.006, 2)
-    frame_parts.append(brace)
+for i, (loc, rot) in enumerate([((-0.92, 0.42, 0), 0.72), ((0.92, 0.42, 0), -0.72)], 1):
+    add_cube(f'cross_brace_{i}', location=loc, scale=(0.018, 0.018, 0.92), rotation=(rot, 0, 0), material=frame_mat, bevel=0.0015)
 
-# Drain pan
-bpy.ops.mesh.primitive_cube_add(location=(0, 0.24, 0))
-drain = bpy.context.active_object
-drain.name = 'drain_pan'
-drain.scale = (1.0, 0.05, 0.72)
-drain.data.materials.append(chute_mat)
-apply_bevel(drain, 0.01, 2)
+# Drain pan / trough
+add_cube('drain_pan', location=(0, 0.19, 0), scale=(1.02, 0.04, 0.7), material=stainless, bevel=0.002)
+add_cube('drain_pan_left_wall', location=(0, 0.27, -0.67), scale=(1.0, 0.05, 0.02), material=stainless, bevel=0.0015)
+add_cube('drain_pan_right_wall', location=(0, 0.27, 0.67), scale=(1.0, 0.05, 0.02), material=stainless, bevel=0.0015)
+add_cube('drain_pan_water', location=(0, 0.225, 0), scale=(0.95, 0.008, 0.6), material=water, bevel=0.001)
 
-# Water sheen in pan
-bpy.ops.mesh.primitive_cube_add(location=(0, 0.31, 0))
-water = bpy.context.active_object
-water.name = 'drain_water'
-water.scale = (0.96, 0.01, 0.68)
-water.data.materials.append(water_mat)
-apply_bevel(water, 0.004, 1)
+# Trough under drum
+add_cube('drum_trough', location=(0.2, 0.84, 0), scale=(0.72, 0.025, 0.6), material=stainless, bevel=0.002)
+add_cube('trough_lip_left', location=(0.2, 0.89, -0.57), scale=(0.7, 0.03, 0.015), material=stainless, bevel=0.001)
+add_cube('trough_lip_right', location=(0.2, 0.89, 0.57), scale=(0.7, 0.03, 0.015), material=stainless, bevel=0.001)
 
-# Output chute
-bpy.ops.mesh.primitive_cube_add(location=(1.32, frame_height + 0.33, 0), rotation=(0, 0, math.radians(-30)))
-chute = bpy.context.active_object
-chute.name = 'output_chute'
-chute.scale = (0.48, 0.035, 0.36)
-chute.data.materials.append(chute_mat)
-apply_bevel(chute, 0.01, 2)
+# Improved output chute with bent lip look
+add_cube('output_chute', location=(1.33, 0.92, 0), scale=(0.42, 0.022, 0.32), rotation=(0, 0, math.radians(-26)), material=stainless, bevel=0.002)
+add_cube('output_chute_lip_left', location=(1.34, 1.02, -0.29), scale=(0.38, 0.06, 0.012), rotation=(0, 0, math.radians(-26)), material=stainless, bevel=0.0015)
+add_cube('output_chute_lip_right', location=(1.34, 1.02, 0.29), scale=(0.38, 0.06, 0.012), rotation=(0, 0, math.radians(-26)), material=stainless, bevel=0.0015)
+add_cube('output_chute_nose', location=(1.58, 0.8, 0), scale=(0.1, 0.012, 0.29), rotation=(0, 0, math.radians(-40)), material=stainless, bevel=0.001)
 
-# Trough guide
-bpy.ops.mesh.primitive_cube_add(location=(0.3, frame_height + 0.22, 0))
-trough = bpy.context.active_object
-trough.name = 'drum_trough'
-trough.scale = (0.8, 0.05, 0.68)
-trough.data.materials.append(chute_mat)
-apply_bevel(trough, 0.01, 2)
-
-# Spray manifold
-bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.04, depth=1.62, location=(0, frame_height + drum_radius * 2 + 0.18, 0), rotation=(math.pi / 2, 0, 0))
-manifold = bpy.context.active_object
-manifold.name = 'spray_manifold'
-manifold.data.materials.append(stainless)
-shade_smooth(manifold)
-
+# Spray manifold and nozzles
+add_cylinder('spray_manifold', location=(0, 2.12, 0), radius=0.032, depth=1.58, rotation=(math.pi / 2, 0, 0), material=stainless, vertices=24)
 for i in range(5):
-    z = -0.54 + i * 0.27
-    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.015, depth=0.26, location=(0.05 * math.sin(i), frame_height + drum_radius * 2 + 0.05, z))
-    nozzle = bpy.context.active_object
-    nozzle.name = f'spray_nozzle_{i+1}'
-    nozzle.data.materials.append(stainless)
-    shade_smooth(nozzle)
+    z = -0.52 + i * 0.26
+    add_cylinder(f'spray_nozzle_{i + 1}', location=(0.0, 2.02, z), radius=0.011, depth=0.18, material=stainless, vertices=14)
+    add_cylinder(f'spray_tip_{i + 1}', location=(0.02, 1.93, z), radius=0.006, depth=0.05, rotation=(math.pi / 2, 0, 0), material=stainless, vertices=12)
 
-# Motor housing
-bpy.ops.mesh.primitive_cube_add(location=(-1.42, 0.48, 0.54))
-motor = bpy.context.active_object
-motor.name = 'motor_housing'
-motor.scale = (0.28, 0.22, 0.18)
-motor.data.materials.append(motor_mat)
-apply_bevel(motor, 0.02, 2)
+# Motor housing with shaft and sprockets
+add_cube('motor_housing', location=(-1.42, 0.48, 0.54), scale=(0.28, 0.22, 0.18), material=motor_mat, bevel=0.004)
+add_cylinder('gearbox', location=(-1.15, 0.48, 0.54), radius=0.08, depth=0.32, rotation=(0, math.pi / 2, 0), material=motor_mat, vertices=24)
+add_cylinder('drive_shaft', location=(-1.0, 0.88, 0.54), radius=0.016, depth=0.42, rotation=(0, math.pi / 2, 0), material=stainless, vertices=18)
+add_torus('drum_sprocket', location=(-0.8, center_y, 0.54), major_radius=0.16, minor_radius=0.024, rotation=(0, math.pi / 2, 0), material=chain_mat)
+add_torus('motor_sprocket', location=(-1.16, 0.48, 0.54), major_radius=0.1, minor_radius=0.02, rotation=(0, math.pi / 2, 0), material=chain_mat)
+for idx, y in enumerate([0.58, 0.68, 0.78, 0.88, 0.98, 1.08]):
+    add_cube(f'chain_link_{idx + 1}', location=(-0.98, y, 0.54), scale=(0.018, 0.075, 0.012), rotation=(0, 0, math.radians(86 - idx * 3)), material=chain_mat, bevel=0.0008)
 
-bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=0.08, depth=0.34, location=(-1.13, 0.48, 0.54), rotation=(0, math.pi / 2, 0))
-gearbox = bpy.context.active_object
-gearbox.name = 'gearbox'
-gearbox.data.materials.append(motor_mat)
-shade_smooth(gearbox)
-
-# Chain drive
-bpy.ops.mesh.primitive_torus_add(major_radius=0.18, minor_radius=0.03, major_segments=32, minor_segments=12, location=(-0.96, frame_height + drum_radius + 0.04, 0.54), rotation=(0, math.pi / 2, 0))
-drum_sprocket = bpy.context.active_object
-drum_sprocket.name = 'drum_sprocket'
-drum_sprocket.data.materials.append(chain_mat)
-shade_smooth(drum_sprocket)
-
-bpy.ops.mesh.primitive_torus_add(major_radius=0.11, minor_radius=0.024, major_segments=28, minor_segments=12, location=(-1.16, 0.48, 0.54), rotation=(0, math.pi / 2, 0))
-motor_sprocket = bpy.context.active_object
-motor_sprocket.name = 'motor_sprocket'
-motor_sprocket.data.materials.append(chain_mat)
-shade_smooth(motor_sprocket)
-
-for idx, y in enumerate([0.62, 0.70, 0.78, 0.86, 0.94, 1.02]):
-    bpy.ops.mesh.primitive_cube_add(location=(-1.06, y, 0.54), rotation=(0, 0, math.radians(90 - idx * 2)))
-    link = bpy.context.active_object
-    link.name = f'chain_link_{idx+1}'
-    link.scale = (0.02, 0.09, 0.015)
-    link.data.materials.append(chain_mat)
-    apply_bevel(link, 0.003, 1)
-
-# Feet pads
-for i, (x, z) in enumerate([(-0.92, -0.64), (-0.92, 0.64), (0.92, -0.64), (0.92, 0.64)], 1):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.06, depth=0.02, location=(x, 0.01, z))
-    foot = bpy.context.active_object
-    foot.name = f'foot_pad_{i}'
-    foot.data.materials.append(frame_mat)
-    shade_smooth(foot)
-
-# Apply transforms
-for obj in bpy.data.objects:
-    if obj.type == 'MESH':
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-        obj.select_set(False)
-
-bpy.ops.object.select_all(action='SELECT')
-bpy.ops.export_scene.gltf(filepath=OUTPUT_PATH, export_format='GLB', export_apply=True, export_texcoords=True, export_normals=True, export_materials='EXPORT', export_yup=True)
+apply_all_mesh_transforms()
+export_glb(OUTPUT_PATH)
 print(f'Exported {OUTPUT_PATH}')
